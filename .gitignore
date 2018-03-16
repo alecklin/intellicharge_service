@@ -1,0 +1,7 @@
+.gradle
+.idea
+data
+build
+out
+snowmobile.iml
+spark-warehouse/
