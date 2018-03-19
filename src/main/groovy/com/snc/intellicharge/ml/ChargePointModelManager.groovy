@@ -11,7 +11,7 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory
 import org.springframework.stereotype.Service
 
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 @Service
 class ChargePointModelManager {
 

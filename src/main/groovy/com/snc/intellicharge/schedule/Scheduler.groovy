@@ -5,7 +5,7 @@ import groovy.transform.InheritConstructors
 import org.springframework.stereotype.Service
 
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 @Service
 class Scheduler {
     // File: newtimer.groovy

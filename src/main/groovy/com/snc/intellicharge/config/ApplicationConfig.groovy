@@ -12,7 +12,7 @@ import org.springframework.web.client.RestTemplate
 
 @Configuration
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 class ApplicationConfig {
 
     @Value('${slack.incoming.webhook.url}')

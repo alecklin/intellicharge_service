@@ -15,7 +15,7 @@ import scala.collection.Seq
 
 @Slf4j
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 class ChargePointOutletStatusClassifier {
     SparkSession spark
     NaiveBayesModel model

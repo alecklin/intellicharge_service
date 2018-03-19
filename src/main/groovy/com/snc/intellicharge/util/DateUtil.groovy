@@ -5,7 +5,7 @@ import groovy.transform.InheritConstructors
 import org.springframework.stereotype.Component
 
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 @Component
 class DateUtil {
     Date getDateFromYearMonthDay(Date date, int year, int month, int day) {

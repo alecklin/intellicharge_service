@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service
 import java.text.DecimalFormat
 
 @Canonical
-@InheritConstructors
+//@InheritConstructors
 @Service
 class RealtimeInsightGenerator {
 

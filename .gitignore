@@ -1,7 +1,7 @@
-.gradle
-.idea
-data
-build
-out
-snowmobile.iml
-spark-warehouse/
+/.gradle
+/.idea
+/data/
+/build/
+/out/
+/snowmobile.iml
+/spark-warehouse/
