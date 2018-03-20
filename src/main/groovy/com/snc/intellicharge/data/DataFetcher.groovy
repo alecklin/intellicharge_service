@@ -56,7 +56,7 @@ class DataFetcher {
     }
 
     void fetchLatestDatapoint() {
-        def proc = "/usr/bin/scp -i /Users/chowie.lin/.ssh/chowielin.pem ubuntu@${collectorHost}:/home/ubuntu/chargepoint/latest/* /Users/chowie.lin/chargepoint/latest".execute()
+        def proc = "/usr/bin/scp -i /Users/chowie.lin/.ssh/chowielin.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${collectorHost}:/home/ubuntu/chargepoint/latest/* /Users/chowie.lin/chargepoint/latest".execute()
         proc.waitFor()
 //                    println "Latest data retrieved rc: ${proc.exitValue()}"
     }
