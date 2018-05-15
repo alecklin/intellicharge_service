@@ -55,23 +55,33 @@ class RealtimeInsightGenerator {
     int pollingInterval
     int mlIntervalDelay
     int mlInterval
+    List<Integer> unavailVelocities = new ArrayList<>()
 
     String lastIntervalPredictedSysId
     Date lastPredictionLookaheadNotifyDate
+
+    public RealtimeInsightGenerator() {
+
+    }
 
     @Autowired
     RealtimeInsightGenerator(@Value('${prediction.lookahead.time}') String predictionWarningTimesStr,
                              @Value('${prediction.lookahead.notify.interval}') String predictionLookaheadNotifyIntervalStr,
                              @Value('${polling.interval}') String pollingIntervalStr,
                              @Value('${ml.interval.delay}') String mlIntervalDelayStr,
-                             @Value('${ml.interval}') String mlIntervalStr
+                             @Value('${ml.interval}') String mlIntervalStr,
+                             @Value('${insight.predict.allunvail.velocities}') String insightPredictUnavailVelocitiesStr
 
-    ) {
+                             ) {
         predictionLookaheadTime = predictionWarningTimesStr as Integer
         predictionLookaheadNotifyInterval = predictionLookaheadNotifyIntervalStr as Integer
         pollingInterval = pollingIntervalStr as Integer
         mlIntervalDelay = mlIntervalDelayStr as Integer
         mlInterval = mlIntervalStr as Integer
+        String[] unavailVelocitiesStrs = insightPredictUnavailVelocitiesStr.split(',')
+        unavailVelocitiesStrs.each {
+            unavailVelocities.add(Integer.parseInt(it))
+        }
     }
 
     void predictAvail() {
@@ -89,7 +99,7 @@ class RealtimeInsightGenerator {
                         24.times {
                             rawHourOfDay ->
                                 int hourOfDay = rawHourOfDay + 1
-                                (60/fChargePointModelManager.minToCondenseBy).times {
+                                (60 / fChargePointModelManager.minToCondenseBy).times {
                                     rawMinOfHour ->
                                         int minOfHour = rawMinOfHour + 1
                                         String libsvmLine = "0 1:${dayOfWeek} 2:${hourOfDay} 3:${minOfHour}"
@@ -196,9 +206,9 @@ class RealtimeInsightGenerator {
                                         )
                                         dayOfWeekToWindowIntervalsMap[dayOfWeek] << [
                                                 startWindowHourOfDay: startWindowHourOfDay,
-                                                startWindowMinOfHour:startWindowMinOfHour,
-                                                endWindowHourOfDay: endWindowHourOfDay,
-                                                endWindowMinOfHour: endWindowMinOfHour
+                                                startWindowMinOfHour: startWindowMinOfHour,
+                                                endWindowHourOfDay  : endWindowHourOfDay,
+                                                endWindowMinOfHour  : endWindowMinOfHour
                                         ]
                                     }
                                     // reset tracking
@@ -258,9 +268,9 @@ class RealtimeInsightGenerator {
                             )
                             dayOfWeekToWindowIntervalsMap[dayOfWeek] << [
                                     startWindowHourOfDay: startWindowHourOfDay,
-                                    startWindowMinOfHour:startWindowMinOfHour,
-                                    endWindowHourOfDay: endWindowHourOfDay,
-                                    endWindowMinOfHour: endWindowMinOfHour
+                                    startWindowMinOfHour: startWindowMinOfHour,
+                                    endWindowHourOfDay  : endWindowHourOfDay,
+                                    endWindowMinOfHour  : endWindowMinOfHour
                             ]
 
                         }
@@ -296,14 +306,14 @@ class RealtimeInsightGenerator {
 
             Collection<Map> intervals = dayOfWeekToWindowIntervalsMap[dayOfWeek]
 
-            intervals.eachWithIndex{ Map interval, int idx ->
+            intervals.eachWithIndex { Map interval, int idx ->
                 if (intervals.size() == 1) {
                     // only one interval means avail all day long
                     allDayInsight = [
-                            type: 3,
+                            type     : 3,
                             dayOfWeek: dayOfWeek,
-                            interval: interval,
-                            msg: "On $dayOfWeekStr, charge ports are available the entire day"
+                            interval : interval,
+                            msg      : "On $dayOfWeekStr, charge ports are available the entire day"
                     ]
                 } else if (idx == 0) {
                     // more than one interval
@@ -321,10 +331,10 @@ class RealtimeInsightGenerator {
 
                     if (firstIntervalEndDate <= maxMorningEndTime) {
                         morningInsight = [
-                                type: 0,
+                                type     : 0,
                                 dayOfWeek: dayOfWeek,
-                                interval: interval,
-                                msg: "On $dayOfWeekStr, all charge ports are taken up by ${firstIntervalEndDate.format('hh:mma')}"
+                                interval : interval,
+                                msg      : "On $dayOfWeekStr, all charge ports are taken up by ${firstIntervalEndDate.format('hh:mma')}"
                         ]
                     }
                 } else if (idx == intervals.size() - 1) {
@@ -386,10 +396,10 @@ class RealtimeInsightGenerator {
 
                     if (intervalStartDate <= maxNoonStartTime && intervalDuration >= noonMinDuration) {
                         noonInsights << [
-                                type: 1,
+                                type     : 1,
                                 dayOfWeek: dayOfWeek,
-                                interval: interval,
-                                msg: "On $dayOfWeekStr, some charge ports are available between ${intervalStartDate.format('hh:mma')} and ${intervalEndDate.format('hh:mma')}"
+                                interval : interval,
+                                msg      : "On $dayOfWeekStr, some charge ports are available between ${intervalStartDate.format('hh:mma')} and ${intervalEndDate.format('hh:mma')}"
                         ]
                     }
                 }
@@ -398,7 +408,7 @@ class RealtimeInsightGenerator {
                 println "Morning insight: ${morningInsight.msg}"
                 fSnowDAO.createInsightRecord(morningInsight)
             }
-            noonInsights.eachWithIndex{ Map insight, int i ->
+            noonInsights.eachWithIndex { Map insight, int i ->
                 println "Noon insight ${i + 1}: ${insight.msg}"
                 insight.order = i + 1
                 fSnowDAO.createInsightRecord(insight)
@@ -413,7 +423,7 @@ class RealtimeInsightGenerator {
             }
         }
         long endTime = System.currentTimeMillis()
-        println "RealtimeInsightGenerator.storePredictions finished and took ${(endTime - startTime)/1000} seconds"
+        println "RealtimeInsightGenerator.storePredictions finished and took ${(endTime - startTime) / 1000} seconds"
     }
 
     /*
@@ -481,18 +491,21 @@ class RealtimeInsightGenerator {
     int availCountOld = Integer.MIN_VALUE
     int inuseCountOld = 0
     int unknownCountOld = 0
+    Date oldDate
+    List<Double> velocities = new Stack<>()
 
     void generateInsightsFromRealtimeDatapoint() {
         fDataFetcher.fetchLatestDatapoint()
 
-        def (int availCount, int inuseCount, int unknownCount, int totalCount) = fDataScientist.fetchStatusCountsFromLatestDatapoint()
+        def (Date date, int availCount, int inuseCount, int unknownCount, int totalCount) = fDataScientist.fetchStatusCountsFromLatestDatapoint()
 
         // real-time stats
-        generateRealtimeInsights(availCountOld, inuseCountOld, unknownCountOld, availCount, inuseCount, unknownCount, totalCount)
+        generateRealtimeInsights(oldDate, date, availCountOld, inuseCountOld, unknownCountOld, availCount, inuseCount, unknownCount, totalCount)
 
         availCountOld = availCount
         inuseCountOld = inuseCount
         unknownCountOld = unknownCount
+        oldDate = date
 
         // See if current timestamp falls within an available interval or not to warn based upon prediction
         // get current date
@@ -540,13 +553,103 @@ class RealtimeInsightGenerator {
         }
     }
 
-    void generateRealtimeInsights(int availCountOld, int inuseCountOld, int unknownCountOld,
+    static void main(String[] args) {
+        use(groovy.time.TimeCategory) {
+            RealtimeInsightGenerator realtimeInsightGenerator = new RealtimeInsightGenerator()
+            Date currDate = new Date()
+            double velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 10, 9)
+            println "velocity: $velocity/min"
+
+            realtimeInsightGenerator.velocities << velocity
+
+            velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 9, 7)
+            println "velocity: $velocity/min"
+            realtimeInsightGenerator.velocities << velocity
+
+            velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 7, 4)
+            println "velocity: $velocity/min"
+            realtimeInsightGenerator.velocities << velocity
+
+            realtimeInsightGenerator.unavailVelocities = [1, 2, 3]
+
+            def msg = realtimeInsightGenerator.predictAllGoneByVelocities(10)
+            String predictMsg = msg.join('\n')
+            println predictMsg
+        }
+    }
+
+    double computeVelocity(Date oldDate, Date newDate, int availCountOld, int availCount) {
+        // compute velocity
+        double velocity = 0
+        use(groovy.time.TimeCategory) {
+            if (oldDate && newDate) {
+                def duration = newDate - oldDate
+                def durationInMin = duration.toMilliseconds() / 1000 / 60
+                velocity = availCountOld - availCount / durationInMin
+            }
+        }
+        velocity
+    }
+
+    List<String> predictAllGoneByVelocities(int availCount) {
+        def predictMsgs = []
+        use(groovy.time.TimeCategory) {
+            // use velocities to predict
+            unavailVelocities.each {
+                int count = 0
+                double velocityAvg = 0
+                for (int idx = velocities.size() - 1; idx >= 0; idx--) {
+                    double currVelocity = velocities.get(idx)
+                    if (it > velocities.size()) {
+                        return
+                    }
+                    if (count == it) {
+                        break
+                    }
+                    count++
+                    velocityAvg += currVelocity
+                }
+                velocityAvg /= count
+                println "velocityAvg: $velocityAvg"
+                if (velocityAvg > 0) {
+                    int minToGone = Math.round(availCount / velocityAvg)
+                    if (minToGone > 0) {
+                        Date dateGone = new Date() + minToGone.minutes
+                        predictMsgs << "By ${dateGone.format('HH:mm a')} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
+                    }
+                }
+            }
+        }
+        predictMsgs
+    }
+
+    void generateRealtimeInsights(Date oldDate, Date date, int availCountOld, int inuseCountOld, int unknownCountOld,
                                   int availCount, int inuseCount, int unknownCount, int totalCount) {
         double percentAvail = ((availCount as double) / (totalCount as double)) * 100d
         DecimalFormat df = new DecimalFormat("#.##")
         String percentAvailStr = "${df.format(percentAvail)}%"
         String percentChangeOfTotal = percentChange(availCountOld, availCount, totalCount)
 //                    println "Status counts: AVAIL: $availCount; IN_USE: $inuseCount; UNKNOWN: $unknownCount"
+
+
+        String dateString = date.format('HH:mm:ss a')
+        double velocity = computeVelocity(oldDate, date, availCountOld, availCount)
+        List<String> gonePredictMsgs = []
+
+        // if velocity is negative, then reset
+        if (velocity <= 0) {
+            this.velocities = []
+        } else {
+            // positive velocity means ports are decreasing
+            this.velocities << velocity
+            int numToKeep = unavailVelocities.last()
+            int numToDrop = this.velocities.size() - numToKeep
+            if (numToDrop > 0) {
+                this.velocities = this.velocities.drop(numToDrop)
+            }
+            gonePredictMsgs = predictAllGoneByVelocities(availCount)
+        }
+
 
         if (availCountOld != Integer.MIN_VALUE) {
             if (availCount > 0) {
@@ -555,7 +658,7 @@ class RealtimeInsightGenerator {
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
                             .color('009900')
-                            .preText("Available count became non-zero from $availCountOld -> $availCount, a change of ${availCount - availCountOld} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
+                            .preText("$dateString: Available count became non-zero from $availCountOld -> $availCount, a change of ${availCount - availCountOld} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
                             .title('IntelliCharge', 'http://localhost:8080/$sn_intellicharge.do')
                             .addField(new SlackAttachment.Field('Available Count', "$availCount of $totalCount ($percentAvailStr)", false))
                             .addField(new SlackAttachment.Field('In Use Count', "$inuseCount", false))
@@ -576,7 +679,7 @@ class RealtimeInsightGenerator {
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
                             .color('009900')
-                            .preText("Available count increased from $availCountOld -> $availCount, a change of +${availCount - availCountOld} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
+                            .preText("$dateString: Available count increased from $availCountOld -> $availCount, a change of +${availCount - availCountOld} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
                             .title('IntelliCharge', 'http://localhost:8080/$sn_intellicharge.do')
                             .addField(new SlackAttachment.Field('Available Count', "$availCount of $totalCount ($percentAvailStr)", false))
                             .addField(new SlackAttachment.Field('In Use Count', "$inuseCount", false))
@@ -597,11 +700,16 @@ class RealtimeInsightGenerator {
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
                             .color('ffcc00')
-                            .preText("Available count decreased from $availCountOld -> $availCount, a change of -${availCountOld - availCount} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
+                            .preText("$dateString: Available count decreased from $availCountOld -> $availCount, a change of -${availCountOld - availCount} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
                             .title('IntelliCharge', 'http://localhost:8080/$sn_intellicharge.do')
                             .addField(new SlackAttachment.Field('Available Count', "$availCount of $totalCount ($percentAvailStr)", false))
                             .addField(new SlackAttachment.Field('In Use Count', "$inuseCount", false))
                             .addField(new SlackAttachment.Field('Unknown Count', "$unknownCount", false))
+
+                    if (gonePredictMsgs) {
+                        String predictMsg = gonePredictMsgs.join('\n')
+                        slackAttachment1.addField(new SlackAttachment.Field('Predict', "$predictMsg", false))
+                    }
 
                     sendSlackAttachment(slackAttachment1)
                     sendSlackAttachment(slackAttachment1, fConfigProps.notificationSlackChannelAvailDowngrade)
@@ -614,7 +722,7 @@ class RealtimeInsightGenerator {
                 SlackAttachment slackAttachment1 = new SlackAttachment()
                 slackAttachment1
                         .color('990000')
-                        .preText("Available count went to zero from $availCountOld, a change of -${availCountOld - availCount} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
+                        .preText("$dateString: Available count went to zero from $availCountOld, a change of -${availCountOld - availCount} (${percentChange(availCountOld, availCount)}) (${percentChangeOfTotal} of ${totalCount})")
                         .title('IntelliCharge', 'http://localhost:8080/$sn_intellicharge.do')
                         .addField(new SlackAttachment.Field('Available Count', "$availCount of $totalCount ($percentAvailStr)", false))
                         .addField(new SlackAttachment.Field('In Use Count', "$inuseCount", false))
@@ -632,7 +740,7 @@ class RealtimeInsightGenerator {
             SlackAttachment slackAttachment1 = new SlackAttachment()
             slackAttachment1
                     .color('0099ff')
-                    .preText('Initial charge port status counts')
+                    .preText("$dateString: Initial charge port status counts")
                     .title('IntelliCharge', 'http://localhost:8080/$sn_intellicharge.do')
                     .addField(new SlackAttachment.Field('Available Count', "$availCount of $totalCount ($percentAvailStr)", false))
                     .addField(new SlackAttachment.Field('In Use Count', "$inuseCount", false))

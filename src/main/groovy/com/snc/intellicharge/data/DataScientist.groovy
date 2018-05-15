@@ -10,6 +10,8 @@ import org.apache.commons.compress.archivers.zip.ZipFile
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
+import java.text.SimpleDateFormat
+
 @Canonical
 //@InheritConstructors
 @Service
@@ -44,11 +46,12 @@ class DataScientist {
         fChargePointDataFileToLibSVM.convertTimestampAvailCountFilesToSVM(timestampFilesDir, timestampAvailFile)
     }
 
-    int[] fetchStatusCountsFromLatestDatapoint() {
+    Object[] fetchStatusCountsFromLatestDatapoint() {
         int availCount = 0
         int inuseCount = 0
         int unknownCount = 0
         int totalCount = 0
+        Date time
 
         // for each .zip file, get charge ports status and add up available, unknown, in_use ports
         new File('/Users/chowie.lin/chargepoint/latest').eachFileMatch({ String name ->
@@ -66,6 +69,12 @@ class DataScientist {
                                 InputStreamReader zfIsr = new InputStreamReader(zfIs, 'UTF-8')
                                 def json = new JsonSlurper().parse(zfIsr)
                                 String deviceIdStr = json[0].summaries[0].device_id
+
+                                String timeStr = json[0].time
+                                SimpleDateFormat sdf = new SimpleDateFormat('yyyy-MM-dd HH:mm:ss.SSS')
+                                sdf.setTimeZone(TimeZone.getTimeZone('GMT'))
+                                time = sdf.parse(timeStr)
+
                                 String outlet1Status = json[0].summaries[0].port_status.outlet_1.status
                                 String outlet2Status = json[0].summaries[0].port_status.outlet_2.status
 
@@ -111,6 +120,6 @@ class DataScientist {
         }
 
         totalCount = availCount + inuseCount + unknownCount
-        [availCount, inuseCount, unknownCount, totalCount]
+        [time, availCount, inuseCount, unknownCount, totalCount]
     }
 }
