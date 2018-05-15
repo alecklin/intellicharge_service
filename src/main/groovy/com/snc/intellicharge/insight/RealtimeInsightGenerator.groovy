@@ -570,7 +570,7 @@ class RealtimeInsightGenerator {
             println "velocity: $velocity/min"
             realtimeInsightGenerator.velocities << velocity
 
-            realtimeInsightGenerator.unavailVelocities = [1, 2, 3]
+            realtimeInsightGenerator.unavailVelocities = [1, 3, 5]
 
             def msg = realtimeInsightGenerator.predictAllGoneByVelocities(10)
             String predictMsg = msg.join('\n')
@@ -615,7 +615,7 @@ class RealtimeInsightGenerator {
                     int minToGone = Math.round(availCount / velocityAvg)
                     if (minToGone > 0) {
                         Date dateGone = new Date() + minToGone.minutes
-                        predictMsgs << "By ${dateGone.format('HH:mm a')} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
+                        predictMsgs << "By ${dateGone.format('HH:mm a', TimeZone.getDefault())} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
                     }
                 }
             }
@@ -632,7 +632,7 @@ class RealtimeInsightGenerator {
 //                    println "Status counts: AVAIL: $availCount; IN_USE: $inuseCount; UNKNOWN: $unknownCount"
 
 
-        String dateString = date.format('HH:mm:ss a')
+        String dateString = date.format('HH:mm:ss a', TimeZone.getDefault())
         double velocity = computeVelocity(oldDate, date, availCountOld, availCount)
         List<String> gonePredictMsgs = []
 
