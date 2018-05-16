@@ -492,7 +492,7 @@ class RealtimeInsightGenerator {
     int inuseCountOld = 0
     int unknownCountOld = 0
     Date oldDate
-    List<Double> velocities = new Stack<>()
+    List<Double> velocities = new ArrayList<Double>()
 
     void generateInsightsFromRealtimeDatapoint() {
         fDataFetcher.fetchLatestDatapoint()
@@ -557,16 +557,16 @@ class RealtimeInsightGenerator {
         use(groovy.time.TimeCategory) {
             RealtimeInsightGenerator realtimeInsightGenerator = new RealtimeInsightGenerator()
             Date currDate = new Date()
-            double velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 10, 9)
+            double velocity = realtimeInsightGenerator.computeVelocity(currDate - 85.seconds, currDate, 10, 9)
             println "velocity: $velocity/min"
 
             realtimeInsightGenerator.velocities << velocity
 
-            velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 9, 7)
+            velocity = realtimeInsightGenerator.computeVelocity(currDate - 137.seconds, currDate, 9, 8)
             println "velocity: $velocity/min"
             realtimeInsightGenerator.velocities << velocity
 
-            velocity = realtimeInsightGenerator.computeVelocity(currDate - 1.minute, currDate, 7, 4)
+            velocity = realtimeInsightGenerator.computeVelocity(currDate - 89.seconds, currDate, 7, 6)
             println "velocity: $velocity/min"
             realtimeInsightGenerator.velocities << velocity
 
@@ -585,7 +585,7 @@ class RealtimeInsightGenerator {
             if (oldDate && newDate) {
                 def duration = newDate - oldDate
                 def durationInMin = duration.toMilliseconds() / 1000 / 60
-                velocity = availCountOld - availCount / durationInMin
+                velocity = (availCountOld - availCount) / durationInMin
             }
         }
         velocity
@@ -612,10 +612,12 @@ class RealtimeInsightGenerator {
                 velocityAvg /= count
                 println "velocityAvg: $velocityAvg"
                 if (velocityAvg > 0) {
-                    int minToGone = Math.round(availCount / velocityAvg)
-                    if (minToGone > 0) {
-                        Date dateGone = new Date() + minToGone.minutes
-                        predictMsgs << "By ${dateGone.format('hh:mm a', TimeZone.getTimeZone("America/Los_Angeles"))} ${new Date()} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
+                    int secToGone = Math.round((availCount / velocityAvg) * 60d)
+                    if (secToGone > 0) {
+                        Date dateGone = new Date() + secToGone.seconds
+                        double minToGone = secToGone / 60d
+                        DecimalFormat df = new DecimalFormat("#.00")
+                        predictMsgs << "By ${dateGone.format('hh:mm a', TimeZone.getTimeZone("America/Los_Angeles"))} $availCount ports predicted all gone in ${df.format(minToGone)} minutes at a rate of ${df.format(velocityAvg)}/min over last $count velocities"
                     }
                 }
             }
