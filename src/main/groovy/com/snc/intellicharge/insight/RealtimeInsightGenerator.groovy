@@ -596,13 +596,13 @@ class RealtimeInsightGenerator {
         use(groovy.time.TimeCategory) {
             // use velocities to predict
             unavailVelocities.each {
+                if (it > velocities.size()) {
+                    return
+                }
                 int count = 0
                 double velocityAvg = 0
                 for (int idx = velocities.size() - 1; idx >= 0; idx--) {
                     double currVelocity = velocities.get(idx)
-                    if (it > velocities.size()) {
-                        return
-                    }
                     if (count == it) {
                         break
                     }
@@ -615,7 +615,7 @@ class RealtimeInsightGenerator {
                     int minToGone = Math.round(availCount / velocityAvg)
                     if (minToGone > 0) {
                         Date dateGone = new Date() + minToGone.minutes
-                        predictMsgs << "By ${dateGone.format('HH:mm a', TimeZone.getDefault())} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
+                        predictMsgs << "By ${dateGone.format('hh:mm a', TimeZone.getTimeZone("America/Los_Angeles"))} ${new Date()} $availCount ports predicted all gone in $minToGone minutes at a rate of $velocityAvg/min over last $count velocities"
                     }
                 }
             }
@@ -632,7 +632,7 @@ class RealtimeInsightGenerator {
 //                    println "Status counts: AVAIL: $availCount; IN_USE: $inuseCount; UNKNOWN: $unknownCount"
 
 
-        String dateString = date.format('HH:mm:ss a', TimeZone.getDefault())
+        String dateString = date.format('hh:mm:ss a', TimeZone.getTimeZone("America/Los_Angeles"))
         double velocity = computeVelocity(oldDate, date, availCountOld, availCount)
         List<String> gonePredictMsgs = []
 
