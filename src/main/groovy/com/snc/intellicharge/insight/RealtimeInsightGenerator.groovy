@@ -492,6 +492,7 @@ class RealtimeInsightGenerator {
     int inuseCountOld = 0
     int unknownCountOld = 0
     Date oldDate
+    Date oldTransitionDate
     List<Double> velocities = new ArrayList<Double>()
 
     void generateInsightsFromRealtimeDatapoint() {
@@ -635,28 +636,16 @@ class RealtimeInsightGenerator {
 
 
         String dateString = date.format('hh:mm:ss a', TimeZone.getTimeZone("America/Los_Angeles"))
-        double velocity = computeVelocity(oldDate, date, availCountOld, availCount)
-        List<String> gonePredictMsgs = []
-
-        // if velocity is negative, then reset
-        if (velocity <= 0) {
-            this.velocities = []
-        } else {
-            // positive velocity means ports are decreasing
-            this.velocities << velocity
-            int numToKeep = unavailVelocities.last()
-            int numToDrop = this.velocities.size() - numToKeep
-            if (numToDrop > 0) {
-                this.velocities = this.velocities.drop(numToDrop)
-            }
-            gonePredictMsgs = predictAllGoneByVelocities(availCount)
-        }
-
 
         if (availCountOld != Integer.MIN_VALUE) {
             if (availCount > 0) {
                 if (availCountOld == 0) {
                     println "AVAIL count became non-zero from $availCountOld -> $availCount"
+
+                    // reset
+                    this.velocities = []
+                    this.oldTransitionDate = date
+
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
                             .color('009900')
@@ -678,6 +667,10 @@ class RealtimeInsightGenerator {
                 } else if (availCount > availCountOld) {
                     println "AVAIL count increased from $availCountOld -> $availCount, a change of +${availCount - availCountOld}"
 
+                    // reset
+                    this.velocities = []
+                    this.oldTransitionDate = date
+
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
                             .color('009900')
@@ -698,6 +691,20 @@ class RealtimeInsightGenerator {
                             percentChange(availCountOld, availCount), percentChangeOfTotal)
                 } else if (availCount < availCountOld) {
                     println "Available count decreased from $availCountOld -> $availCount, a change of ${availCountOld - availCount} (${percentChange(availCountOld, availCount)})"
+
+                    double velocity = computeVelocity(oldTransitionDate, date, availCountOld, availCount)
+                    List<String> gonePredictMsgs = []
+
+                    this.velocities << velocity
+                    int numToKeep = unavailVelocities.last()
+                    int numToDrop = this.velocities.size() - numToKeep
+                    if (numToDrop > 0) {
+                        this.velocities = this.velocities.drop(numToDrop)
+                    }
+                    gonePredictMsgs = predictAllGoneByVelocities(availCount)
+
+                    // store last transition date
+                    this.oldTransitionDate = date
 
                     SlackAttachment slackAttachment1 = new SlackAttachment()
                     slackAttachment1
@@ -721,6 +728,11 @@ class RealtimeInsightGenerator {
                 }
             } else if (availCount == 0 && availCountOld > 0) {
                 println "AVAIL count went to zero from $availCountOld"
+
+                // reset
+                this.velocities = []
+                this.oldTransitionDate = date
+
                 SlackAttachment slackAttachment1 = new SlackAttachment()
                 slackAttachment1
                         .color('990000')
@@ -738,6 +750,10 @@ class RealtimeInsightGenerator {
             }
         } else {
             println "Initial status counts: AVAIL: $availCount; IN_USE: $inuseCount; UNKNOWN: $unknownCount"
+
+            // reset
+            this.velocities = []
+            this.oldTransitionDate = date
 
             SlackAttachment slackAttachment1 = new SlackAttachment()
             slackAttachment1
