@@ -55,7 +55,8 @@ class DataScientist {
 
         // for each .zip file, get charge ports status and add up available, unknown, in_use ports
         new File('/Users/chowie.lin/chargepoint/latest').eachFileMatch({ String name ->
-            !name.startsWith('122601.')
+            //!name.startsWith('122601.')
+            true
         }) { File timestampFile ->
             ZipFile zf = null
             try {
